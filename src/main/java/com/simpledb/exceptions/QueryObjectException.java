@@ -1,4 +1,4 @@
-package simpledb.exceptions;
+package com.simpledb.exceptions;
 
 public class QueryObjectException extends Exception{
 

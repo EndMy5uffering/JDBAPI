@@ -1,4 +1,4 @@
-package simpledb.database;
+package com.simpledb.database;
 
 import java.io.File;
 import java.io.IOException;
@@ -9,7 +9,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
-import simpledb.exceptions.DatabaseManagerException;
+import com.simpledb.exceptions.DatabaseManagerException;
 
 public class DatabaseManager {
 	

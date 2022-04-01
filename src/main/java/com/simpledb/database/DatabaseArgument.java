@@ -1,4 +1,4 @@
-package simpledb.database;
+package com.simpledb.database;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

@@ -1,13 +1,13 @@
-package simpledb.database;
+package com.simpledb.database;
 
+import static java.lang.annotation.ElementType.CONSTRUCTOR;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 @Retention(RUNTIME)
-@Target(ElementType.TYPE)
-public @interface DatabaseObject {
+@Target(CONSTRUCTOR)
+public @interface DatabaseObjectConstructor {
 
 }

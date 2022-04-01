@@ -1,4 +1,4 @@
-package simpledb.database;
+package com.simpledb.database;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import simpledb.exceptions.QueryObjectException;
+import com.simpledb.exceptions.QueryObjectException;
 
 public class QueryObject {
 	

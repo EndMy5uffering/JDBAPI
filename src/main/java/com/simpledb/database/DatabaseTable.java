@@ -1,4 +1,4 @@
-package simpledb.database;
+package com.simpledb.database;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -10,8 +10,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
-import simpledb.exceptions.DatabaseTableException;
-import simpledb.exceptions.QueryObjectException;
+import com.simpledb.exceptions.DatabaseTableException;
+import com.simpledb.exceptions.QueryObjectException;
 
 public class DatabaseTable {
 	private static Set<Class<?>> templateTypes = Set.of(int.class, boolean.class, byte.class, short.class, long.class, String.class, Integer.class, Boolean.class, Short.class, Long.class, Byte.class);

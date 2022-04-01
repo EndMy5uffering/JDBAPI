@@ -1,4 +1,4 @@
-package simpledb.database;
+package com.simpledb.database;
 
 import java.io.File;
 
