@@ -10,7 +10,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
-import com.simpledb.annotations.DatabaseFieldType;
+import com.simpledb.annotations.DatabaseField;
 import com.simpledb.annotations.DatabaseObject;
 import com.simpledb.exceptions.DatabaseTableException;
 import com.simpledb.exceptions.QueryObjectException;
@@ -159,10 +159,10 @@ public class DatabaseTable {
 		
 		for(Field f : newInstance.getClass().getDeclaredFields()) {
 			f.setAccessible(true);
-			if(f.isAnnotationPresent(DatabaseFieldType.class)) {
+			if(f.isAnnotationPresent(DatabaseField.class)) {
 				if(templateTypes.contains(f.getType())) {
-					if(DatabaseFieldType.util.inSameGroup(groups, f.getAnnotation(DatabaseFieldType.class).groups())) {
-						String columnName = f.getAnnotation(DatabaseFieldType.class).columnName();
+					if(DatabaseField.util.inSameGroup(groups, f.getAnnotation(DatabaseField.class).groups())) {
+						String columnName = f.getAnnotation(DatabaseField.class).columnName();
 						if(columnName.equals("") || columnName == null) columnName = f.getName();
 						f.set(newInstance, resultData.getObject(columnName));
 					}

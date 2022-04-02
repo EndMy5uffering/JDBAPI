@@ -8,7 +8,7 @@ import java.util.Collection;
 
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.FIELD, ElementType.METHOD})
-public @interface DatabaseFieldType {
+public @interface DatabaseField {
 
     public class util{
         public static boolean inSameGroup(Collection<Integer> groups, int[] fieldGroups) {
