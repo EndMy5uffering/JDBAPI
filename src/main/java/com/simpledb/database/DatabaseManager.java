@@ -59,19 +59,23 @@ public class DatabaseManager {
 	 * @throws SQLException 
 	 *  
 	 * */
-	public boolean createDatabaseConnection(DatabaseInfo info) throws IOException, DatabaseManagerException, SQLException{
+	public boolean createDatabaseConnection(DatabaseInfo info) throws DatabaseManagerException{
 		if(info.getType() == DatabaseType.SQLITE) {
 			File sqlitefile = new File(info.getDirectory(), File.separator + info.getFileName() + ".sqlite");
 			if (!sqlitefile.exists()) {
 				try {
 					sqlitefile.createNewFile();
 				} catch (IOException e) {
-					throw new IOException("Could not create new save file!");
+					throw new DatabaseManagerException("Could not create new save file!");
 				}
 			}
 		}
 		
-		this.connection = getNewConnection(info);
+		try {
+			this.connection = getNewConnection(info);
+		} catch (SQLException e) {
+			throw new DatabaseManagerException("Could not connect to database: " + e.getMessage());
+		}
 		if(!testConnection(this.connection)) {
 			throw new DatabaseManagerException("Connection to database failed!");
 		} 
