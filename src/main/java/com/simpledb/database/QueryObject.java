@@ -12,6 +12,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 import com.simpledb.annotations.DatabaseConstructor;
 import com.simpledb.annotations.DatabaseField;
@@ -45,6 +46,21 @@ public class QueryObject {
 	private String tableName = "";
 	private List<Pair<String, String>> ValueList = new ArrayList<>();
 	
+	static{
+		typeConverter.put(int.class, new Pair<>((o) -> ""+o, (s) -> (int)Integer.valueOf(s)));
+		typeConverter.put(boolean.class, new Pair<>((o) -> Boolean.toString((boolean)o), (s) -> (boolean)Boolean.parseBoolean(s)));
+		typeConverter.put(byte.class, new Pair<>((o) -> Byte.toString((byte)o), (s) -> (byte)Byte.parseByte(s)));
+		typeConverter.put(short.class, new Pair<>((o) -> Short.toString((short)o), (s) -> (short)Short.parseShort(s)));
+		typeConverter.put(long.class, new Pair<>((o) -> Long.toString((long)o), (s) -> (long)Long.parseLong(s)));
+		typeConverter.put(String.class, new Pair<>((o) -> (String)o, (s) -> s));
+		typeConverter.put(Integer.class, new Pair<>((o) -> ((Integer)o).toString(), (s) -> Integer.parseInt(s)));
+		typeConverter.put(Boolean.class, new Pair<>((o) -> ((Boolean)o).toString(), (s) -> Boolean.parseBoolean(s)));
+		typeConverter.put(Short.class, new Pair<>((o) -> ((Short)o).toString(), (s) -> Short.parseShort(s)));
+		typeConverter.put(Long.class, new Pair<>((o) -> ((Long)o).toString(), (s) -> Long.parseLong(s)));
+		typeConverter.put(Byte.class, new Pair<>((o) -> ((Byte)o).toString(), (s) -> Byte.parseByte(s)));
+		typeConverter.put(UUID.class, new Pair<>((o) -> ((UUID)o).toString(), (s) -> UUID.fromString(s)));
+	}
+
 	public QueryObject(String commandName, String tableName) {
 		this.commandName = commandName;
 		this.tableName = tableName;
