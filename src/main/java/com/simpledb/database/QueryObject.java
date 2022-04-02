@@ -191,7 +191,7 @@ public class QueryObject {
 			}
 		}
 
-		for(Method m : o.getClass().getMethods()) {
+		for(Method m : o.getClass().getDeclaredMethods()) {
 			m.setAccessible(true);
 			if(m.isAnnotationPresent(DatabaseField.class)) {
 				if(DatabaseField.util.inSameGroup(groupsOfField, m.getAnnotation(DatabaseField.class).groups())) {
