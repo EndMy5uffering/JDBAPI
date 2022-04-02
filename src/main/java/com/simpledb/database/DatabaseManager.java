@@ -91,7 +91,9 @@ public class DatabaseManager {
 			}
 		}
 		this.running = false;
-		lock.notifyAll();
+		synchronized (lock) {
+			lock.notifyAll();
+		}
 	}
 
 	public void asyncSqlStatements(List<QueryObject> list) throws DatabaseManagerException {
