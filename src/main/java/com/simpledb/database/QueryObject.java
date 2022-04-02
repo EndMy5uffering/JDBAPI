@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.simpledb.annotations.DatabaseField;
+import com.simpledb.annotations.DatabaseObject;
 import com.simpledb.exceptions.QueryObjectException;
 
 public class QueryObject {
@@ -27,7 +29,6 @@ public class QueryObject {
 	private String commandName = "";
 	private String tableName = "";
 	private List<Pair<String, String>> ValueList = new ArrayList<>();
-	private List<Pair<String, String>> Args = new ArrayList<>();
 	
 	public QueryObject(String commandName, String tableName) {
 		this.commandName = commandName;
@@ -150,118 +151,75 @@ public class QueryObject {
 	}
 	
 	public void addValues(Object o, int... groups) throws QueryObjectException {
-		Set<Integer> groupsOfField = new HashSet<>();
-		for(int i : groups) groupsOfField.add(i);
-		if(!o.getClass().isAnnotationPresent(DatabaseObject.class)) {
-			throw new IllegalArgumentException("Missing DatabaseObject annotation for object: " + o.getClass().getName());
+		Pair<List<Field>, List<Method>> fieldsMethods = getFieldsAndMethods(o, groups);
+		List<Field> fields = fieldsMethods.getFirst();
+		List<Method> methods = fieldsMethods.getSecond();
+		
+		for(Field f : fields) {
+			String columnName = f.getAnnotation(DatabaseField.class).columnName();
+			if(columnName.equals("") || columnName == null) columnName = f.getName();
+			this.ValueList.add(new Pair<String,String>(columnName, getString(getValue(f, o))));
 		}
 		
-		for(Field f : o.getClass().getDeclaredFields()) {
-			f.setAccessible(true);
-			if(f.isAnnotationPresent(DatabaseValue.class)) {
-				if(templateTypes.contains(f.getType())) {
-					if(inSameGroup(groupsOfField, f.getAnnotation(DatabaseValue.class).groups())) {
-						String columnName = f.getAnnotation(DatabaseValue.class).columnName();
-						if(columnName.equals("") || columnName == null) columnName = f.getName();
-						this.ValueList.add(new Pair<String,String>(columnName, getString(getValue(f, o))));
-					}
-				}else {
-					throw new QueryObjectException("Can not read field of type: " + f.getType().getSimpleName() + " as value type in: " + o.getClass().getSimpleName());
-				}
-			}
+		for(Method m : methods) {
+			String columnName = m.getAnnotation(DatabaseField.class).columnName();
+			if(columnName.equals("") || columnName == null) columnName = m.getName();
+			this.ValueList.add(new Pair<String, String>(columnName, getString(targetInvocationWrapper(o, m))));
 		}
-		
-		for(Method m : o.getClass().getMethods()) {
-			m.setAccessible(true);
-			if(m.isAnnotationPresent(DatabaseValue.class)) {
-				if(inSameGroup(groupsOfField, m.getAnnotation(DatabaseValue.class).groups())) {
-					if(m.getParameterCount() <= 0) {
-						if(templateTypes.contains(m.getReturnType())) {
-							String columnName = m.getAnnotation(DatabaseValue.class).columnName();
-							if(columnName.equals("") || columnName == null) columnName = m.getName();
-							try {
-								this.ValueList.add(new Pair<String, String>(columnName, getString(m.invoke(o))));
-							} catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
-								e.printStackTrace();
-							}
-						}else {
-							throw new QueryObjectException("QueryObject error for: " + o.getClass().getSimpleName() + ".\nFunctions with @DatabaseValue can not have return type: " + m.getReturnType().getSimpleName());
-						}
-					}else {
-						throw new QueryObjectException("Can not read function with @DatabaseValue annotation because it has to many argumetns.\nFunctions with the @DatabaseValue annotation can not have any arguments");
-					}
-				}
-			}
-		}
+
 	}
 	
-	/**
-	 * Adds arguments to the argument list.
-	 * 
-	 * @param column The name of the column the value belongs to.
-	 * @param value The value for the given column name.
-	 * */
-	public void addArgument(String column, String value) {
-		this.Args.add(new Pair<String, String>(column, value));
-	}
-	
-	public void addArguments(Object o) throws QueryObjectException {
-		addArguments(o, 0);
-	}
-	
-	public void addArguments(Object[] o, int... groups) throws QueryObjectException{
-		for(Object obj : o) {
-			if(groups.length > 0) {
-				addArguments(obj, groups);
-			}else {
-				addArguments(obj, 0);
-			}
-		}
-	}
-	
-	public void addArguments(Object o, int... groups) throws QueryObjectException {
+	private Pair<List<Field>, List<Method>> getFieldsAndMethods(Object o, int... groups) throws QueryObjectException{
 		Set<Integer> groupsOfField = new HashSet<>();
 		for(int i : groups) groupsOfField.add(i);
+		List<Field> fields = new ArrayList<>();
+		List<Method> methods = new ArrayList<>();
 		if(!o.getClass().isAnnotationPresent(DatabaseObject.class)) {
-			throw new IllegalArgumentException("Missing DatabaseObject annotation for object: " + o.getClass().getName());
+			throw new QueryObjectException("Missing DatabaseObject annotation for object: " + o.getClass().getName());
 		}
 
 		for(Field f : o.getClass().getDeclaredFields()) {
 			f.setAccessible(true);
-			if(f.isAnnotationPresent(DatabaseArgument.class)) {
+			if(f.isAnnotationPresent(DatabaseField.class)) {
 				if(templateTypes.contains(f.getType())) {
-					if(inSameGroup(groupsOfField, f.getAnnotation(DatabaseArgument.class).groups())) {
-						String columnName = f.getAnnotation(DatabaseArgument.class).columnName();
-						if(columnName.equals("") || columnName == null) columnName = f.getName();
-						this.Args.add(new Pair<String,String>(columnName, getString(getValue(f, o))));
+					if(DatabaseField.util.inSameGroup(groupsOfField, f.getAnnotation(DatabaseField.class).groups())) {
+						fields.add(f);
 					}
 				}else {
 					throw new QueryObjectException("Can not read field of type: " + f.getType().getSimpleName() + " as argument type in: " + o.getClass().getSimpleName());
 				}
 			}
 		}
-		
+
 		for(Method m : o.getClass().getMethods()) {
 			m.setAccessible(true);
-			if(m.isAnnotationPresent(DatabaseArgument.class)) {
-				if(inSameGroup(groupsOfField, m.getAnnotation(DatabaseArgument.class).groups())) {
+			if(m.isAnnotationPresent(DatabaseField.class)) {
+				if(DatabaseField.util.inSameGroup(groupsOfField, m.getAnnotation(DatabaseField.class).groups())) {
 					if(m.getParameterCount() <= 0) {
 						if(templateTypes.contains(m.getReturnType())) {
-							String columnName = m.getAnnotation(DatabaseArgument.class).columnName();
-							if(columnName.equals("") || columnName == null) columnName = m.getName();
-							try {
-								this.Args.add(new Pair<String, String>(columnName, getString(m.invoke(o))));
-							} catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
-								e.printStackTrace();
-							}
+							methods.add(m);
 						}else {
-							throw new QueryObjectException("QueryObject error for: " + o.getClass().getSimpleName() + ".\nFunctions with @DatabaseArgument can not have return type: " + m.getReturnType().getSimpleName());
+							throw new QueryObjectException("QueryObject error for: " + o.getClass().getSimpleName() + ".\nFunctions with @DatabaseFieldType can not have return type: " + m.getReturnType().getSimpleName());
 						}
 					}else {
-						throw new QueryObjectException("Can not read function with @DatabaseArgument annotation because it has to many argumetns.\nFunctions with the @DatabaseArgument annotation can not have any arguments");
+						throw new QueryObjectException("Can not read function with @DatabaseFieldType annotation because it has to many argumetns. Functions with the @DatabaseFieldType annotation can not have any arguments");
 					}
 				}
 			}
+		}
+
+		return new Pair<>(fields, methods);
+	}
+
+	public Object targetInvocationWrapper(Object target, Method method) throws QueryObjectException{
+		try {
+			return method.invoke(target);
+		} catch (IllegalAccessException e) {
+			throw new QueryObjectException("Could not access function: " + method.getName() + " on object: " + target.getClass().getName());
+		} catch(IllegalArgumentException e){
+			throw new QueryObjectException("IllegalArgumentException");
+		} catch(InvocationTargetException e){
+			throw new QueryObjectException("Target function caused an exception: " + e.getTargetException().getClass().getSimpleName() + " | with message: " + e.getTargetException().getMessage());
 		}
 	}
 	
@@ -281,13 +239,6 @@ public class QueryObject {
 		}
 	}
 	
-	private boolean inSameGroup(Set<Integer> groups, int[] fieldGroups) {
-		for(int i : fieldGroups) {
-			if(groups.contains(i)) return true;
-		}
-		return false;
-	}
-	
 	/**
 	 * Sets the query of the query object.<br>
 	 * 
@@ -304,14 +255,6 @@ public class QueryObject {
 	 * */
 	public List<Pair<String, String>> getValueList(){
 		return this.ValueList;
-	}
-	
-	/**
-	 * Returns the argument list.<br>
-	 * All arguments are stored in a pair object with the column name and the value.<br>
-	 * */
-	public List<Pair<String, String>> getArgumentList(){
-		return this.Args;
 	}
 	
 	public String getTableName() {

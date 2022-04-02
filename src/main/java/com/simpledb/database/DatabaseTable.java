@@ -10,6 +10,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
+import com.simpledb.annotations.DatabaseFieldType;
+import com.simpledb.annotations.DatabaseObject;
 import com.simpledb.exceptions.DatabaseTableException;
 import com.simpledb.exceptions.QueryObjectException;
 
@@ -141,7 +143,6 @@ public class DatabaseTable {
 				
 		QueryObject selectFieldData = new QueryObject(queryName, this.tableName);
 		selectFieldData.addValues(t, argGroup);
-		selectFieldData.addArguments(t, argGroup);
 		
 		ResultSet resultData = this.databaseManager.getData(selectFieldData);
 		resultData.next();
@@ -158,10 +159,10 @@ public class DatabaseTable {
 		
 		for(Field f : newInstance.getClass().getDeclaredFields()) {
 			f.setAccessible(true);
-			if(f.isAnnotationPresent(DatabaseValue.class)) {
+			if(f.isAnnotationPresent(DatabaseFieldType.class)) {
 				if(templateTypes.contains(f.getType())) {
-					if(inSameGroup(groups, f.getAnnotation(DatabaseValue.class).groups())) {
-						String columnName = f.getAnnotation(DatabaseValue.class).columnName();
+					if(DatabaseFieldType.util.inSameGroup(groups, f.getAnnotation(DatabaseFieldType.class).groups())) {
+						String columnName = f.getAnnotation(DatabaseFieldType.class).columnName();
 						if(columnName.equals("") || columnName == null) columnName = f.getName();
 						f.set(newInstance, resultData.getObject(columnName));
 					}
@@ -171,13 +172,6 @@ public class DatabaseTable {
 			}
 		}
 		return newInstance;
-	}
-	
-	private boolean inSameGroup(Collection<Integer> groups, int[] fieldGroups) {
-		for(int i : fieldGroups) {
-			if(groups.contains(i)) return true;
-		}
-		return false;
 	}
 	
 	private Constructor<?> getConstructorForClass(Class<?> clazz){

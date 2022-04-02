@@ -1,4 +1,4 @@
-package com.simpledb.database;
+package com.simpledb.annotations;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
