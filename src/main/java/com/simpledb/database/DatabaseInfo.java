@@ -2,7 +2,7 @@ package com.simpledb.database;
 
 import java.io.File;
 
-class DatabaseInfo{
+public class DatabaseInfo{
 	
 	private final String url;
 	private final String user;
@@ -12,7 +12,7 @@ class DatabaseInfo{
 	private final DatabaseType type;
 	
 	public DatabaseInfo(String url, String name, String pass){
-		this.url = "jdbc:mysql:" + url;
+		this.url = "jdbc:mysql://" + url;
 		this.user = name;
 		this.pass = pass;
 		this.fileName = "";

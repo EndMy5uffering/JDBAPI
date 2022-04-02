@@ -83,16 +83,16 @@ public class DatabaseManager {
 	}
 	
 	public void closeConnection() throws DatabaseManagerException {
-		if(this.connection != null) {
-			try {
-				this.connection.close();
-			} catch (SQLException e) {
-				throw new DatabaseManagerException("Exception while closing the connection: " + e.getMessage());
-			}
-		}
-		this.running = false;
 		synchronized (lock) {
+			this.running = false;
 			lock.notifyAll();
+			if(this.connection != null) {
+				try {
+					this.connection.close();
+				} catch (SQLException e) {
+					throw new DatabaseManagerException("Exception while closing the connection: " + e.getMessage());
+				}
+			}
 		}
 	}
 
