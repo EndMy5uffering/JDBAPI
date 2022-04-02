@@ -78,11 +78,16 @@ public class DatabaseManager {
 		return true;
 	}
 	
-	public void closeConnection() throws SQLException {
+	public void closeConnection() throws DatabaseManagerException {
 		if(this.connection != null) {
-			this.connection.close();
-			this.running = false;
+			try {
+				this.connection.close();
+			} catch (SQLException e) {
+				throw new DatabaseManagerException("Exception while closing the connection: " + e.getMessage());
+			}
 		}
+		this.running = false;
+		lock.notifyAll();
 	}
 
 	public void asyncSqlStatements(List<QueryObject> list) throws DatabaseManagerException {
