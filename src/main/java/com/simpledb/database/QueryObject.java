@@ -1,8 +1,11 @@
 package com.simpledb.database;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -10,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.simpledb.annotations.DatabaseConstructor;
 import com.simpledb.annotations.DatabaseField;
 import com.simpledb.annotations.DatabaseObject;
 import com.simpledb.exceptions.QueryObjectException;
@@ -21,8 +25,19 @@ public class QueryObject {
 	//UPDATE {TABLE} SET {VALUES} WHERE {ARGS}
 	//DELETE FROM {TABLE} WHERE {ARGS}
 	
+	public interface ConvertFrom{
+		public String convert(Object o);
+	}
+
+	public interface ConvertTo{
+		public Object convert(String o);
+	}
+
 	private static Map<String, QueryConstructor> QuerryConstruction = new HashMap<>();
-	private static Set<Class<?>> templateTypes = Set.of(int.class, boolean.class, byte.class, short.class, long.class, String.class, Integer.class, Boolean.class, Short.class, Long.class, Byte.class);
+
+	//private static Set<Class<?>> templateTypes = Set.of(int.class, boolean.class, byte.class, short.class, long.class, String.class, Integer.class, Boolean.class, Short.class, Long.class, Byte.class);
+	
+	private static Map<Class<?>, Pair<ConvertFrom, ConvertTo>> typeConverter = new HashMap<>();
 	
 	
 	private String fullQuery = "";
@@ -56,6 +71,11 @@ public class QueryObject {
 			throw new NullPointerException("Could not find a query for the given command name: " + commandName);
 		return constructor.construct(this);
 	}
+
+
+    public static void registerConverter(Class<?> clazz, ConvertFrom from, ConvertTo to){
+        typeConverter.put(clazz, new Pair<>(from, to));
+    }
 	
 	/**
 	 * Will construct a value list from the given Pair list.<br>
@@ -158,15 +178,14 @@ public class QueryObject {
 		for(Field f : fields) {
 			String columnName = f.getAnnotation(DatabaseField.class).columnName();
 			if(columnName.equals("") || columnName == null) columnName = f.getName();
-			this.ValueList.add(new Pair<String,String>(columnName, getString(getValue(f, o))));
+			this.ValueList.add(new Pair<String,String>(columnName, typeConverter.get(f.getType()).getFirst().convert(getValue(f, o))));
 		}
 		
 		for(Method m : methods) {
 			String columnName = m.getAnnotation(DatabaseField.class).columnName();
 			if(columnName.equals("") || columnName == null) columnName = m.getName();
-			this.ValueList.add(new Pair<String, String>(columnName, getString(targetInvocationWrapper(o, m))));
+			this.ValueList.add(new Pair<String, String>(columnName, typeConverter.get(m.getReturnType()).getFirst().convert(targetInvocationWrapper(o, m))));
 		}
-
 	}
 	
 	private Pair<List<Field>, List<Method>> getFieldsAndMethods(Object o, int... groups) throws QueryObjectException{
@@ -181,7 +200,7 @@ public class QueryObject {
 		for(Field f : o.getClass().getDeclaredFields()) {
 			f.setAccessible(true);
 			if(f.isAnnotationPresent(DatabaseField.class)) {
-				if(templateTypes.contains(f.getType())) {
+				if(typeConverter.containsKey(f.getType())) {
 					if(DatabaseField.util.inSameGroup(groupsOfField, f.getAnnotation(DatabaseField.class).groups())) {
 						fields.add(f);
 					}
@@ -196,7 +215,7 @@ public class QueryObject {
 			if(m.isAnnotationPresent(DatabaseField.class)) {
 				if(DatabaseField.util.inSameGroup(groupsOfField, m.getAnnotation(DatabaseField.class).groups())) {
 					if(m.getParameterCount() <= 0) {
-						if(templateTypes.contains(m.getReturnType())) {
+						if(typeConverter.containsKey(m.getReturnType())) {
 							methods.add(m);
 						}else {
 							throw new QueryObjectException("QueryObject error for: " + o.getClass().getSimpleName() + ".\nFunctions with @DatabaseFieldType can not have return type: " + m.getReturnType().getSimpleName());
@@ -209,6 +228,57 @@ public class QueryObject {
 		}
 
 		return new Pair<>(fields, methods);
+	}
+
+	public static <T> List<T> getFromResultSet(Class<T> returnType, ResultSet rs) throws QueryObjectException{
+		Constructor<?> constructor = getDBConstructorForClass(returnType);
+		if(constructor == null) throw new QueryObjectException("No suitable constructor found for class: " + returnType.getName());
+		String[] fieldNames = constructor.getAnnotation(DatabaseConstructor.class).columnName();
+		Class<?>[] typs = constructor.getParameterTypes();
+		Object[] args = new Object[typs.length];
+		List<T> returnlist = new ArrayList<>();
+
+		try {
+			while(rs.next()){
+				int c = 0;
+				for(String fn : fieldNames){
+					String res;
+					try {
+						res = rs.getString(fn);
+					} catch (SQLException e) {
+						throw new QueryObjectException("Could not get field: " + fn + " from result set!");
+					}
+					if(res != null){
+						args[c] = typeConverter.get(typs[c]).getSecond().convert(res);
+					}
+					++c;
+				}
+				try {
+					returnlist.add(safeCast(constructor.newInstance(args), returnType));
+				} catch (InstantiationException e) {
+					throw new QueryObjectException("Could not instantiate object!");
+				} catch (IllegalAccessException e) {
+					throw new QueryObjectException("Could not access object constructor!");
+				} catch (IllegalArgumentException e) {
+					throw new QueryObjectException("Illegal arguments passed to constructor!");
+				} catch (InvocationTargetException e) {
+					throw new QueryObjectException("Construct throw an error: " + e.getTargetException().getMessage());
+				}
+			}
+		} catch (SQLException e) {
+			throw new QueryObjectException("Exception in result set!");
+		}
+
+		return returnlist;
+	}
+
+	private static Constructor<?> getDBConstructorForClass(Class<?> clazz){
+		for(Constructor<?> c : clazz.getConstructors()){
+			if(c.isAnnotationPresent(DatabaseConstructor.class)){
+				return c;
+			}
+		}
+		return null;
 	}
 
 	public Object targetInvocationWrapper(Object target, Method method) throws QueryObjectException{
@@ -280,6 +350,12 @@ public class QueryObject {
 	 * */
 	public static void addQueryConstructor(String commandName, QueryConstructor constructor) {
 		QueryObject.QuerryConstruction.put(commandName, constructor);
+	}
+
+	private static <T> T safeCast(Object o, Class<T> clazz) throws QueryObjectException {
+		if(clazz == null)
+			throw new QueryObjectException("Can not cast object to nullpointer!");
+	    return clazz.isInstance(o) ? clazz.cast(o) : null;
 	}
 }
 

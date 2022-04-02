@@ -17,7 +17,6 @@ public @interface DatabaseField {
             }
             return false;
         }
-
     }
     
     public String columnName() default "";
