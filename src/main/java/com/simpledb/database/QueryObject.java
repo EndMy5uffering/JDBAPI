@@ -309,14 +309,6 @@ public class QueryObject {
 		}
 	}
 	
-	private String getString(Object o) {
-		try {
-			return (String) o;
-		} catch (Exception e) {
-			return String.valueOf(o);
-		}
-	}
-	
 	private Object getValue(Field f, Object o) throws QueryObjectException {
 		try {
 			return f.get(o);
