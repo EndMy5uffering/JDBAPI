@@ -6,8 +6,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import com.simpledb.exceptions.DatabaseManagerException;
 import com.simpledb.exceptions.QueryException;
@@ -22,11 +21,9 @@ public class DatabaseManager {
 		public void handle(QueryException exception);
 	}
 
-	private ArrayList<QueryObject> SQLStatements = new ArrayList<>();
+	private LinkedBlockingQueue<QueryObject> SQLStatements = new LinkedBlockingQueue<>();
 	private Thread asyncWorker;
 	private boolean running = true;
-	
-	private Object lock = new Object();
 	
 	private Connection connection;
 	
@@ -37,24 +34,21 @@ public class DatabaseManager {
 	private void initWorker() {
 		asyncWorker = new Thread(() -> {
 			while(running) {
-				synchronized (lock) {
+				QueryObject q = null;
+				try {
+					q = SQLStatements.take();
+				} catch (InterruptedException e1) {
+					if(running) e1.printStackTrace();
+					running = false;
+				}
+				if(!running) return;
+				if(q != null){
 					try {
-						lock.wait();
-					} catch (InterruptedException e) {
-						running = false;
-						e.printStackTrace();
+						ResultSet rs = connection.prepareStatement(q.getQuery()).executeQuery();
+						if(q.hasCallback()) q.getCallback().callback(rs);
+					} catch (SQLException e) {
+						q.getExceptionHandle().handle(new QueryException(q, e));							
 					}
-					if(!running) return;
-					
-					for(QueryObject q : SQLStatements) {
-						try {
-							ResultSet rs = connection.prepareStatement(q.getQuery()).executeQuery();
-							if(q.hasCallback()) q.getCallback().callback(rs);
-						} catch (SQLException e) {
-							q.getExceptionHandle().handle(new QueryException(q, e));							
-						}
-					}
-					SQLStatements.clear();
 				}
 			}
 		});
@@ -90,33 +84,19 @@ public class DatabaseManager {
 	}
 	
 	public void closeConnection() throws DatabaseManagerException {
-		synchronized (lock) {
-			this.running = false;
-			lock.notifyAll();
-			if(this.connection != null) {
-				try {
-					this.connection.close();
-				} catch (SQLException e) {
-					throw new DatabaseManagerException("Exception while closing the connection: " + e.getMessage());
-				}
+		this.running = false;
+		if(this.connection != null) {
+			try {
+				this.connection.close();
+			} catch (SQLException e) {
+				throw new DatabaseManagerException("Exception while closing the connection: " + e.getMessage());
 			}
 		}
 	}
 
-	public void asyncSqlStatements(List<QueryObject> list) throws DatabaseManagerException {
-		synchronized (lock) {
-			if(!this.running) throw new DatabaseManagerException("Worker not running!");
-			SQLStatements.addAll(list);
-			lock.notify();
-		}
-	}
-		
 	public void asyncSqlStatement(QueryObject query) throws DatabaseManagerException {
-		synchronized (lock) {
-			if(!this.running) throw new DatabaseManagerException("Worker not running!");
-			SQLStatements.add(query);
-			lock.notify();
-		}
+		if(!this.running) throw new DatabaseManagerException("Worker not running!");
+		SQLStatements.add(query);
 	}
 	
 	public boolean executeQuery(QueryObject query) throws QueryException {
