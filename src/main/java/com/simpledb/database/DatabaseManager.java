@@ -10,9 +10,18 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.simpledb.exceptions.DatabaseManagerException;
+import com.simpledb.exceptions.QueryException;
 
 public class DatabaseManager {
 	
+	public interface AsyncCallback{
+		public void callback(ResultSet rs);
+	}
+
+	public interface AsyncSQLExceptionHandle{
+		public void handle(QueryException exception);
+	}
+
 	private ArrayList<QueryObject> SQLStatements = new ArrayList<>();
 	private Thread asyncWorker;
 	private boolean running = true;
@@ -39,13 +48,13 @@ public class DatabaseManager {
 					
 					for(QueryObject q : SQLStatements) {
 						try {
-							connection.prepareStatement(q.getQuery()).execute();
+							ResultSet rs = connection.prepareStatement(q.getQuery()).executeQuery();
+							if(q.hasCallback()) q.getCallback().callback(rs);
 						} catch (SQLException e) {
-							e.printStackTrace();
-							running = false;
-							return;
+							q.getExceptionHandle().handle(new QueryException(q, e));							
 						}
 					}
+					SQLStatements.clear();
 				}
 			}
 		});
@@ -54,9 +63,7 @@ public class DatabaseManager {
 	
 	/**
 	 * This function sets up the database access.
-	 * @throws IOException 
 	 * @throws DatabaseManagerException 
-	 * @throws SQLException 
 	 *  
 	 * */
 	public boolean createDatabaseConnection(DatabaseInfo info) throws DatabaseManagerException{
@@ -112,8 +119,20 @@ public class DatabaseManager {
 		}
 	}
 	
-	public boolean executeQuery(QueryObject query) throws SQLException {
-		return connection.prepareStatement(query.getQuery()).execute();
+	public boolean executeQuery(QueryObject query) throws QueryException {
+		try {
+			return connection.prepareStatement(query.getQuery()).execute();
+		} catch (SQLException e) {
+			throw new QueryException(query, e);
+		}
+	}
+
+	public int executeUpdate(QueryObject query) throws QueryException{
+		try {
+			return connection.prepareStatement(query.getQuery()).executeUpdate();
+		} catch (SQLException e) {
+			throw new QueryException(query, e);
+		}
 	}
 	
 	private boolean testConnection(Connection con) {
@@ -129,13 +148,13 @@ public class DatabaseManager {
 	public boolean hasTable(String TableName) {
 		try {
 			return executeQuery(QueryObject.getQueryObject("SELECT * FROM " + TableName));
-		} catch (SQLException e) {
+		} catch (QueryException e) {
 			return false;
 		}
 	}
 	
 	public synchronized ResultSet getData(QueryObject query) throws SQLException {
-		return connection.createStatement().executeQuery(query.getQuery());
+		return connection.prepareStatement(query.getQuery()).executeQuery();
 	}
 	
 	public static DatabaseInfo getDatabaseInfo(String url, String name, String pass) {

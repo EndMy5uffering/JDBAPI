@@ -45,7 +45,10 @@ public class QueryObject {
 	private String commandName = "";
 	private String tableName = "";
 	private List<Pair<String, String>> ValueList = new ArrayList<>();
-	
+	private DatabaseManager.AsyncCallback callback = null;
+	private DatabaseManager.AsyncSQLExceptionHandle exceptionHandle = null;
+	private static DatabaseManager.AsyncSQLExceptionHandle defaultExceptonHandle = (e) -> e.getSqlException().printStackTrace();
+
 	static{
 		typeConverter.put(int.class, new Pair<>((o) -> ""+o, (s) -> (int)Integer.valueOf(s)));
 		typeConverter.put(boolean.class, new Pair<>((o) -> Boolean.toString((boolean)o), (s) -> (boolean)Boolean.parseBoolean(s)));
@@ -316,7 +319,32 @@ public class QueryObject {
 			throw new QueryObjectException("Could not get value form field: " + f.getName());
 		}
 	}
+
+	public void setAsyncCallback(DatabaseManager.AsyncCallback callback){
+		this.callback = callback;		
+	}
+
+	protected DatabaseManager.AsyncCallback getCallback(){
+		return this.callback;
+	}
 	
+	protected boolean hasCallback(){
+		return this.callback != null;
+	}
+
+	public void setAsyncExceptionHandle(DatabaseManager.AsyncSQLExceptionHandle handle){
+		this.exceptionHandle = handle;
+	}
+
+	protected DatabaseManager.AsyncSQLExceptionHandle getExceptionHandle(){
+		return this.exceptionHandle != null ? this.exceptionHandle : QueryObject.defaultExceptonHandle;
+	}
+
+	public void setDefaultAsyncExceptonHandle(DatabaseManager.AsyncSQLExceptionHandle handle){
+		if(handle == null) throw new IllegalArgumentException("Default handle can not be null!");
+		QueryObject.defaultExceptonHandle = handle;
+	}
+
 	/**
 	 * Sets the query of the query object.<br>
 	 * 
